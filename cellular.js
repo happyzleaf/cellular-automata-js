@@ -21,28 +21,6 @@ class Game {
         }
     }
 
-    draw(x, y, width, height, cell) {
-        if (cell) {
-            this.ctx.fillStyle = 'white';
-        } else {
-            this.ctx.fillStyle = this.ctx.createLinearGradient(0, 0, this.ctx.canvas.width, 0);
-            this.ctx.fillStyle.addColorStop(0, '#d53a9d');
-            this.ctx.fillStyle.addColorStop(1, '#743ad5');
-        }
-
-        this.ctx.fillRect(x, y, x + width, y + height);
-    }
-
-    render() {
-        this.draw(0, 0, this.ctx.canvas.width, this.ctx.canvas.height, false);
-
-        for (let y = 0; y < this.columns; ++y) {
-            for (let x = 0; x < this.rows; ++x) {
-                this.draw(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, this.state[x][y]);
-            }
-        }
-    }
-
     calculate() {
         this.state = [];
         for (let x = 0; x < this.rows; ++x) {
@@ -55,9 +33,32 @@ class Game {
     }
 
     click(event) {
-        let x = Math.floor(event.offsetX / (this.ctx.canvas.width));
-        let y = event.offsetY;
-        console.log('Clicked [' + x + ', ' + y + ']');
+        let x = Math.floor(event.offsetX / CELL_SIZE);
+        let y = Math.floor(event.offsetY / CELL_SIZE);
+        if (x < 0 || x >= this.rows || y < 0 || y >= this.columns) {
+            return;
+        }
+
+        this.state[x][y] = !this.state[x][y];
+        this.render();
+    }
+
+    render() {
+        for (let y = 0; y < this.columns; ++y) {
+            for (let x = 0; x < this.rows; ++x) {
+                let cellX = x * CELL_SIZE;
+                let cellY = y * CELL_SIZE;
+
+                if (this.state[x][y]) {
+                    this.ctx.fillStyle = 'white';
+                } else {
+                    this.ctx.fillStyle = this.ctx.createLinearGradient(0, 0, this.ctx.canvas.width, 0);
+                    this.ctx.fillStyle.addColorStop(0, '#d53a9d');
+                    this.ctx.fillStyle.addColorStop(1, '#743ad5');
+                }
+                this.ctx.fillRect(cellX, cellY, cellX + CELL_SIZE, cellY + CELL_SIZE);
+            }
+        }
     }
 }
 
@@ -76,10 +77,10 @@ let main = () => {
 
     game.calculate();
     game.render();
-    setInterval(() => {
-        game.calculate();
-        game.render();
-    }, 3000);
+    // setInterval(() => {
+    // game.calculate();
+    // game.render();
+    // }, 3000);
 };
 
 main();
