@@ -4,24 +4,39 @@ const CELL_SIZE = 20;
 const CELL_LIFE = 100; // in millis
 
 class Game {
-    constructor(app, ctx, rows, columns) {
+    constructor(app, ctx) {
         this.app = app;
         this.ctx = ctx;
+        this.rows = 0;
+        this.columns = 0;
+        this.state = [];
+        this.runnable = undefined // No clue if this is cool in js
+        this.running = false;
+
         this.ctx.canvas.addEventListener('click', (e) => this.click(e));
+    }
+
+    resize(rows, columns) {
+        let state = [];
+        for (let x = 0; x < rows; ++x) {
+            let line = [];
+            for (let y = 0; y < columns; ++y) {
+                if (x >= this.rows || y >= this.columns) {
+                    line.push(false);
+                } else {
+                    line.push(this.state[x][y]);
+                }
+            }
+            state.push(line);
+        }
+        this.state = state;
 
         this.rows = rows;
         this.columns = columns;
+        this.app.width = CELL_SIZE * this.rows;
+        this.app.height = CELL_SIZE * this.columns;
 
-        this.runnable = undefined // No clue if this is cool in js
-        this.running = false;
-        this.state = [];
-        for (let x = 0; x < this.rows; ++x) {
-            let columns = [];
-            for (let y = 0; y < this.columns; ++y) {
-                columns.push(false);
-            }
-            this.state.push(columns);
-        }
+        this.render();
     }
 
     run() {
@@ -30,8 +45,8 @@ class Game {
             return;
         }
 
-        this.calculate();
-        this.runnable = setInterval(() => this.calculate(), CELL_LIFE);
+        this.step();
+        this.runnable = setInterval(() => this.step(), CELL_LIFE);
         this.running = true;
 
         console.log('[CELLULAR] Simulation ran.')
@@ -68,19 +83,19 @@ class Game {
             + this.countIfAlive(x + 1, y + 1);
     }
 
-    calculate() {
+    step() {
         let state = [];
         for (let x = 0; x < this.rows; ++x) {
-            let columns = [];
+            let line = [];
             for (let y = 0; y < this.columns; ++y) {
                 let neighbours = this.countNeighbours(x, y);
                 if (this.state[x][y]) {
-                    columns.push(neighbours == 2 || neighbours == 3);
+                    line.push(neighbours == 2 || neighbours == 3);
                 } else {
-                    columns.push(neighbours == 3);
+                    line.push(neighbours == 3);
                 }
             }
-            state.push(columns);
+            state.push(line);
         }
 
         this.state = state;
@@ -117,19 +132,16 @@ class Game {
     }
 }
 
+let resize = (game) => {
+    game.resize(Math.floor(window.innerWidth * 0.8 / CELL_SIZE), Math.floor(window.innerHeight * 0.8 / CELL_SIZE));
+};
+
 let main = () => {
     let app = document.getElementById('app');
     let ctx = app.getContext('2d');
 
-    let w = window.innerWidth * 0.8;
-    let h = window.innerHeight * 0.8;
-    let rows = Math.floor(w / CELL_SIZE);
-    let columns = Math.floor(h / CELL_SIZE);
-
-    app.width = w;
-    app.height = h;
-    let game = new Game(app, ctx, rows, columns);
-    game.render();
+    let game = new Game(app, ctx);
+    resize(game);
 
     document.addEventListener('keyup', (event) => {
         if (event.code !== "Space") {
@@ -141,6 +153,10 @@ let main = () => {
         } else {
             game.run();
         }
+    });
+
+    window.addEventListener('resize', (event) => {
+        resize(game);
     });
 };
 
