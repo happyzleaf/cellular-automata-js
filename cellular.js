@@ -1,6 +1,7 @@
 "use strict"
 
 const CELL_SIZE = 20;
+const CELL_LIFE = 2000; // in millis
 
 class Game {
     constructor(app, ctx, rows, columns) {
@@ -11,6 +12,8 @@ class Game {
         this.rows = rows;
         this.columns = columns;
 
+        this.runnable = undefined // No clue if this is cool in js
+        this.running = false;
         this.state = [];
         for (let x = 0; x < this.rows; ++x) {
             let columns = [];
@@ -19,6 +22,31 @@ class Game {
             }
             this.state.push(columns);
         }
+    }
+
+    run() {
+        if (this.running) {
+            console.log('[CELLULAR] Game is already running.');
+            return;
+        }
+
+        this.calculate();
+        this.runnable = setInterval(() => this.calculate(), CELL_LIFE);
+        this.running = true;
+
+        console.log('[CELLULAR] Simulation ran.')
+    }
+
+    stop() {
+        if (!this.running) {
+            console.log('[CELLULAR] Game is not running.');
+            return;
+        }
+
+        clearInterval(this.runnable);
+        this.running = false;
+
+        console.log('[CELLULAR] Simulation stopped.')
     }
 
     calculate() {
@@ -30,6 +58,7 @@ class Game {
             }
             this.state.push(columns);
         }
+        this.render();
     }
 
     click(event) {
@@ -74,13 +103,19 @@ let main = () => {
     app.width = w;
     app.height = h;
     let game = new Game(app, ctx, rows, columns);
-
-    game.calculate();
     game.render();
-    // setInterval(() => {
-    // game.calculate();
-    // game.render();
-    // }, 3000);
+
+    document.addEventListener('keyup', (event) => {
+        if (event.code !== "Space") {
+            return;
+        }
+
+        if (game.running) {
+            game.stop();
+        } else {
+            game.run();
+        }
+    });
 };
 
 main();
