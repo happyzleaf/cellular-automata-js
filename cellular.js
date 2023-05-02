@@ -1,7 +1,7 @@
 "use strict"
 
 const CELL_SIZE = 20;
-const CELL_LIFE = 2000; // in millis
+const CELL_LIFE = 100; // in millis
 
 class Game {
     constructor(app, ctx, rows, columns) {
@@ -49,15 +49,41 @@ class Game {
         console.log('[CELLULAR] Simulation stopped.')
     }
 
+    countIfAlive(x, y) {
+        if (x < 0 || x >= this.rows || y < 0 || y >= this.columns) {
+            return 0;
+        }
+
+        return this.state[x][y] ? 1 : 0; // TODO: does it work with this.state[x][y] only?
+    }
+
+    countNeighbours(x, y) {
+        return this.countIfAlive(x - 1, y - 1)
+            + this.countIfAlive(x, y - 1)
+            + this.countIfAlive(x + 1, y - 1)
+            + this.countIfAlive(x - 1, y)
+            + this.countIfAlive(x + 1, y)
+            + this.countIfAlive(x - 1, y + 1)
+            + this.countIfAlive(x, y + 1)
+            + this.countIfAlive(x + 1, y + 1);
+    }
+
     calculate() {
-        this.state = [];
+        let state = [];
         for (let x = 0; x < this.rows; ++x) {
             let columns = [];
             for (let y = 0; y < this.columns; ++y) {
-                columns.push(Math.random() < 0.1);
+                let neighbours = this.countNeighbours(x, y);
+                if (this.state[x][y]) {
+                    columns.push(neighbours == 2 || neighbours == 3);
+                } else {
+                    columns.push(neighbours == 3);
+                }
             }
-            this.state.push(columns);
+            state.push(columns);
         }
+
+        this.state = state;
         this.render();
     }
 
