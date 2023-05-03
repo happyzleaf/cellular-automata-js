@@ -1,7 +1,11 @@
 "use strict"
 
-const CELL_SIZE = 20;
+const CELL_SIZE = 15;
 const CELL_LIFE = 100; // in millis
+
+const BG_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--bg');
+const FG_LEFT_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--fg-left');
+const FG_RIGHT_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--fg-right');
 
 class Game {
     constructor(app, ctx) {
@@ -49,7 +53,7 @@ class Game {
         this.runnable = setInterval(() => this.step(), CELL_LIFE);
         this.running = true;
 
-        console.log('[CELLULAR] Simulation ran.')
+        console.log('[CELLULAR] Simulation ran.');
     }
 
     stop() {
@@ -61,7 +65,7 @@ class Game {
         clearInterval(this.runnable);
         this.running = false;
 
-        console.log('[CELLULAR] Simulation stopped.')
+        console.log('[CELLULAR] Simulation stopped.');
     }
 
     countIfAlive(x, y) {
@@ -72,15 +76,26 @@ class Game {
         return this.state[x][y] ? 1 : 0; // TODO: does it work with this.state[x][y] only?
     }
 
-    countNeighbours(x, y) {
-        return this.countIfAlive(x - 1, y - 1)
-            + this.countIfAlive(x, y - 1)
-            + this.countIfAlive(x + 1, y - 1)
-            + this.countIfAlive(x - 1, y)
-            + this.countIfAlive(x + 1, y)
-            + this.countIfAlive(x - 1, y + 1)
-            + this.countIfAlive(x, y + 1)
-            + this.countIfAlive(x + 1, y + 1);
+    countNeighbours(cellX, cellY) {
+        let count = 0;
+
+        for (let x = cellX - 1; x <= cellX + 1; ++x) {
+            if (x < 0 || x >= this.rows) {
+                continue;
+            }
+
+            for (let y = cellY - 1; y <= cellY + 1; ++y) {
+                if ((x == cellX && y == cellY) || y < 0 || y >= this.columns) {
+                    continue;
+                }
+
+                if (this.state[x][y] && ++count > 3) {
+                    return 4;
+                }
+            }
+        }
+
+        return count;
     }
 
     step() {
@@ -120,11 +135,11 @@ class Game {
                 let cellY = y * CELL_SIZE;
 
                 if (this.state[x][y]) {
-                    this.ctx.fillStyle = 'white';
+                    this.ctx.fillStyle = BG_COLOR;
                 } else {
                     this.ctx.fillStyle = this.ctx.createLinearGradient(0, 0, this.ctx.canvas.width, 0);
-                    this.ctx.fillStyle.addColorStop(0, '#d53a9d');
-                    this.ctx.fillStyle.addColorStop(1, '#743ad5');
+                    this.ctx.fillStyle.addColorStop(0, FG_LEFT_COLOR);
+                    this.ctx.fillStyle.addColorStop(1, FG_RIGHT_COLOR);
                 }
                 this.ctx.fillRect(cellX, cellY, cellX + CELL_SIZE, cellY + CELL_SIZE);
             }
@@ -144,14 +159,15 @@ let main = () => {
     resize(game);
 
     document.addEventListener('keyup', (event) => {
-        if (event.code !== "Space") {
-            return;
-        }
-
-        if (game.running) {
-            game.stop();
-        } else {
-            game.run();
+        if (event.code === "Space") {
+            if (game.running) {
+                game.stop();
+            } else {
+                game.run();
+            }
+        } else if (event.code === "KeyS") {
+            game.step();
+            console.log('[CELLULAR] Step taken.');
         }
     });
 

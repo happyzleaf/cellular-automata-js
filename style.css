@@ -1,3 +1,15 @@
+:root {
+    /* Light mode */
+    /* --bg: white; */
+    /* --fg-left: #743ad5; */
+    /* --fg-right: #d53a9d; */
+
+    /* Dark mode */
+    --bg: #343a40;
+    --fg-left: #743ad5;
+    --fg-right: #d53a9d;
+}
+
 html,
 body {
     height: 100%;
@@ -8,14 +20,14 @@ body {
     align-items: center;
     justify-content: center;
 
-    background: #343a40;
+    background: var(--bg);
 }
 
 .box {
     border: 10px solid;
     border-image-slice: 1;
     border-width: 5px;
-    border-image-source: linear-gradient(to left, #743ad5, #d53a9d);
+    border-image-source: linear-gradient(to left, var(--fg-right), var(--fg-left));
 
     box-shadow: 0 19px 38px rgba(0, 0, 0, 0.30), 0 15px 12px rgba(0, 0, 0, 0.22);
 }
