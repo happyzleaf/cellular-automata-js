@@ -7,6 +7,13 @@ const BG_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--
 const FG_LEFT_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--fg-left');
 const FG_RIGHT_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--fg-right');
 
+// Rainbow
+// const COLORS = ['#ff0000', '#ffa500', '#ffff00', '#008000', '#0000ff', '#4b0082', '#ee82ee'];
+
+// Blue-green scale
+const COLORS = ['#423ED9', '#4274DD', '#46AEE0', '#4AE3DF', '#4EE7AD', '#53EA7C'];
+const COLOR_MASK = Math.floor(256 / COLORS.length).toString(16).padStart(2, '0');
+
 class Game {
     constructor(app, ctx) {
         this.app = app;
@@ -16,6 +23,7 @@ class Game {
         this.state = [];
         this.runnable = undefined // No clue if this is cool in js
         this.running = false;
+        this.colorIndex = 0;
 
         this.ctx.canvas.addEventListener('click', (e) => this.click(e));
     }
@@ -40,6 +48,7 @@ class Game {
         this.app.width = CELL_SIZE * this.rows;
         this.app.height = CELL_SIZE * this.columns;
 
+        this.clear();
         this.render();
     }
 
@@ -115,6 +124,10 @@ class Game {
 
         this.state = state;
         this.render();
+
+        if (++this.colorIndex >= COLORS.length) {
+            this.colorIndex = 0;
+        }
     }
 
     click(event) {
@@ -125,23 +138,36 @@ class Game {
         }
 
         this.state[x][y] = !this.state[x][y];
-        this.render();
+        if (this.state[x][y]) {
+            this.ctx.fillStyle = COLORS[this.colorIndex];
+        } else {
+            this.ctx.fillStyle = this.ctx.createLinearGradient(0, 0, this.ctx.canvas.width, 0);
+            this.ctx.fillStyle.addColorStop(0, FG_LEFT_COLOR);
+            this.ctx.fillStyle.addColorStop(1, FG_RIGHT_COLOR);
+        }
+        this.ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    }
+
+    clear(alpha) {
+        if (typeof alpha === 'undefined') {
+            alpha = 'ff';
+        }
+
+        this.ctx.fillStyle = this.ctx.createLinearGradient(0, 0, this.ctx.canvas.width, 0);
+        this.ctx.fillStyle.addColorStop(0, FG_LEFT_COLOR + alpha);
+        this.ctx.fillStyle.addColorStop(1, FG_RIGHT_COLOR + alpha);
+        this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
     }
 
     render() {
+        this.clear(COLOR_MASK);
+
         for (let y = 0; y < this.columns; ++y) {
             for (let x = 0; x < this.rows; ++x) {
-                let cellX = x * CELL_SIZE;
-                let cellY = y * CELL_SIZE;
-
                 if (this.state[x][y]) {
-                    this.ctx.fillStyle = BG_COLOR;
-                } else {
-                    this.ctx.fillStyle = this.ctx.createLinearGradient(0, 0, this.ctx.canvas.width, 0);
-                    this.ctx.fillStyle.addColorStop(0, FG_LEFT_COLOR);
-                    this.ctx.fillStyle.addColorStop(1, FG_RIGHT_COLOR);
+                    this.ctx.fillStyle = COLORS[this.colorIndex];
+                    this.ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
                 }
-                this.ctx.fillRect(cellX, cellY, cellX + CELL_SIZE, cellY + CELL_SIZE);
             }
         }
     }
