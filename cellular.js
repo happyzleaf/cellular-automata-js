@@ -14,6 +14,67 @@ const FG_RIGHT_COLOR = getComputedStyle(document.documentElement).getPropertyVal
 const COLORS = ['#423ED9', '#4274DD', '#46AEE0', '#4AE3DF', '#4EE7AD', '#53EA7C'];
 const COLOR_MASK = Math.floor(256 / COLORS.length).toString(16).padStart(2, '0');
 
+const REG_REMOVE_WHITESPACE = /\s*/g;
+const REG_GET_XY = /^x=(\d+),y=(\d+).*$/i;
+const REG_GET_VALUE = /(\d*)([bo])/gi;
+class Structure {
+    constructor(str) {
+        this.success = false;
+
+        let lines = str
+            .split('\n') // Split into single lines
+            .map((line) => line.replace(REG_REMOVE_WHITESPACE, '')) // Remove all whitespaces
+            .filter((line) => line && !line.startsWith('#')); // Filter empty and comment lines
+
+        if (lines.length < 1) return;
+        [this.columns, this.rows] = REG_GET_XY.exec(lines[0]).slice(1);
+
+        this.state = [];
+        for (let line of lines.slice(1)) {
+            for (let row of line.split('$')) {
+                this.state.push(this.parseRow(row, this.columns));
+            }
+
+            if (line.endsWith('!')) {
+                break;
+            }
+        }
+
+        // for (let x = 0; x < this.rows; ++x) {
+        //     let toPrint = ''
+        //     for (let y = 0; y < this.columns; ++y) {
+        //         toPrint += this.state[x][y] ? 'x' : '_';
+        //     }
+        //     console.log(toPrint);
+        // }
+
+        this.success = true;
+    }
+
+    parseRow(line, length) {
+        let row = [];
+
+        let values;
+        while ((values = REG_GET_VALUE.exec(line)) !== null) {
+            let [amount, state] = values.splice(1);
+            if (!amount) {
+                amount = 1;
+            }
+
+            for (let y = 0; y < amount; ++y) {
+                row.push(state === 'o');
+            }
+        }
+
+        // Fill remaining cells
+        for (let y = row.length; y < length; ++y) {
+            row.push(false);
+        }
+
+        return row;
+    }
+}
+
 class Game {
     constructor(app, ctx) {
         this.app = app;
@@ -200,6 +261,20 @@ let main = () => {
     window.addEventListener('resize', (event) => {
         resize(game);
     });
+
+    // new Structure(`
+    //     #C This is a glider.
+    //     x = 3, y = 3
+    //     bo$2bo$3o!
+    // `);
+    // new Structure(`
+    //     #N Gosper glider gun
+    //     #C This was the first gun discovered.
+    //     #C As its name suggests, it was discovered by Bill Gosper.
+    //     x = 36, y = 9, rule = B3/S23
+    //     24bo$22bobo$12b2o6b2o12b2o$11bo3bo4b2o12b2o$2o8bo5bo3b2o$2o8bo3bob2o4b
+    //     obo$10bo5bo7bo$11bo3bo$12b2o!    
+    // `);
 };
 
 main();
