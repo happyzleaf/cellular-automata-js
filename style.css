@@ -24,10 +24,7 @@ body {
 }
 
 .box {
-    border: 10px solid;
-    border-image-slice: 1;
-    border-width: 5px;
-    border-image-source: linear-gradient(to left, var(--fg-right), var(--fg-left));
-
+    /* padding: 10px; */
+    /* background: linear-gradient(to left, var(--fg-right), var(--fg-left)); */
     box-shadow: 0 19px 38px rgba(0, 0, 0, 0.30), 0 15px 12px rgba(0, 0, 0, 0.22);
 }

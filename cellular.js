@@ -2,6 +2,7 @@
 
 const CELL_SIZE = 15;
 const CELL_LIFE = 100; // in millis
+const CHUNK_SIZE = 32; // cells per chunk
 
 const BG_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--bg');
 const FG_LEFT_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--fg-left');
@@ -13,6 +14,66 @@ const FG_RIGHT_COLOR = getComputedStyle(document.documentElement).getPropertyVal
 // Blue-green scale
 const COLORS = ['#423ED9', '#4274DD', '#46AEE0', '#4AE3DF', '#4EE7AD', '#53EA7C'];
 const COLOR_MASK = Math.floor(256 / COLORS.length).toString(16).padStart(2, '0');
+
+const vec2 = (x, y) => new Vec2(x, y);
+const vec2unpack = (k) => vec2(
+    Number(BigInt.asIntN(32, k >> 32n)),
+    Number(BigInt.asIntN(32, k & ((1n << 32n) - 1n)))
+);
+class Vec2 {
+    constructor(x = 0, y = 0) {
+        this.x = x;
+        this.y = y;
+    }
+
+    add(a, b) {
+        if (a instanceof Vec2) {
+            return vec2(this.x + a.x, this.y + a.y);
+        }
+        if (typeof a === 'number') {
+            return vec2(this.x + a, this.y + (b ?? a));
+        }
+    }
+
+    sub(a, b) {
+        if (a instanceof Vec2) {
+            return vec2(this.x - a.x, this.y - a.y);
+        }
+        if (typeof a === 'number') {
+            return vec2(this.x - a, this.y - (b ?? a));
+        }
+    }
+
+    mul(a, b) {
+        if (a instanceof Vec2) {
+            return vec2(this.x * a.x, this.y * a.y);
+        }
+        if (typeof a === 'number') {
+            return vec2(this.x * a, this.y * (b ?? a));
+        }
+    }
+
+    div(a, b) {
+        if (a instanceof Vec2) {
+            return vec2(this.x / a.x, this.y / a.y);
+        }
+        if (typeof a === 'number') {
+            return vec2(this.x / a, this.y / (b ?? a));
+        }
+    }
+
+    map(a, b) {
+        a = a ?? (p => p);
+        b = b ?? a;
+        return vec2(a(this.x), b(this.y));
+    }
+
+    pack() {
+        const X = BigInt.asUintN(32, BigInt(this.x));
+        const Y = BigInt.asUintN(32, BigInt(this.y));
+        return (X << 32n) | Y;
+    }
+}
 
 const REG_REMOVE_WHITESPACE = /\s*/g;
 const REG_GET_XY = /^x=(\d+),y=(\d+).*$/i;
@@ -75,42 +136,86 @@ class Structure {
     }
 }
 
+class Camera {
+    constructor(app) {
+        this.app = app;
+        this.rows = 0; // Visible rows
+        this.columns = 0; // Visible columns
+        this.origin = vec2(); // Camera offset in cells
+    }
+
+    resize() {
+        this.rows = Math.floor(window.innerWidth * 0.8 / CELL_SIZE);
+        this.columns = Math.floor(window.innerHeight * 0.8 / CELL_SIZE);
+        this.app.width = CELL_SIZE * this.rows;
+        this.app.height = CELL_SIZE * this.columns;
+    }
+}
+
+class Chunk {
+    constructor(cells) {
+        this.cells = cells || Array.from({ length: CHUNK_SIZE }, () => Array(CHUNK_SIZE).fill(false));
+
+        this.count = 0;
+        for (const row of this.cells) {
+            for (const cell of row) {
+                if (cell) ++this.count;
+            }
+        }
+    }
+
+    get(cell) {
+        return this.cells[cell.x][cell.y];
+    }
+
+    set(cell, alive) {
+        const wasAlive = this.cells[cell.x, cell.y];
+        this.cells[cell.x][cell.y] = alive;
+        if (wasAlive && !alive) --this.count;
+        else if (!wasAlive && alive) ++this.count;
+    }
+}
+
 class Game {
     constructor(app, ctx) {
         this.app = app;
         this.ctx = ctx;
-        this.rows = 0;
-        this.columns = 0;
-        this.state = [];
-        this.runnable = undefined // No clue if this is cool in js
-        this.running = false;
+        this.camera = new Camera(app);
+        this.chunks = new Map(); // key => chunk with CHUNK_SIZE x CHUNK_SIZE cells
+        this.running = null;
         this.colorIndex = 0;
-
-        this.ctx.canvas.addEventListener('click', (e) => this.click(e));
     }
 
-    resize(rows, columns) {
-        let state = [];
-        for (let x = 0; x < rows; ++x) {
-            let line = [];
-            for (let y = 0; y < columns; ++y) {
-                if (x >= this.rows || y >= this.columns) {
-                    line.push(false);
-                } else {
-                    line.push(this.state[x][y]);
-                }
-            }
-            state.push(line);
+    getChunk(key, create = false) {
+        let chunk = this.chunks.get(key);
+        if (!chunk && create) {
+            chunk = new Chunk();
+            this.chunks.set(key, chunk);
         }
-        this.state = state;
 
-        this.rows = rows;
-        this.columns = columns;
-        this.app.width = CELL_SIZE * this.rows;
-        this.app.height = CELL_SIZE * this.columns;
+        return chunk;
+    }
 
-        this.clear();
-        this.render();
+    getCell(worldPosition) {
+        const chunkPosition = worldPosition.div(CHUNK_SIZE).map(Math.floor)
+        const chunk = this.getChunk(chunkPosition.pack());
+        if (!chunk) return false;
+
+        const cellPosition = worldPosition.sub(chunkPosition.mul(CHUNK_SIZE))
+        return chunk.get(cellPosition);
+    }
+
+    setCell(worldPosition, alive) {
+        const chunkPosition = worldPosition.div(CHUNK_SIZE).map(Math.floor);
+        const chunk = this.getChunk(chunkPosition.pack(), alive);
+        if (!chunk) return;
+
+        const cellPosition = worldPosition.sub(chunkPosition.mul(CHUNK_SIZE));
+        chunk.set(cellPosition, alive);
+        if (!alive && !chunk.count) {
+            const chunkKey = chunkPosition.unpack();
+            this.chunks.delete(chunkKey);
+        }
     }
 
     run() {
@@ -120,8 +225,7 @@ class Game {
         }
 
         this.step();
-        this.runnable = setInterval(() => this.step(), CELL_LIFE);
-        this.running = true;
+        this.running = setInterval(() => this.step(), CELL_LIFE);
 
         console.log('[CELLULAR] Simulation ran.');
     }
@@ -132,58 +236,63 @@ class Game {
             return;
         }
 
-        clearInterval(this.runnable);
-        this.running = false;
+        clearInterval(this.running);
+        this.running = null;
 
         console.log('[CELLULAR] Simulation stopped.');
     }
 
-    countIfAlive(x, y) {
-        if (x < 0 || x >= this.rows || y < 0 || y >= this.columns) {
-            return 0;
-        }
+    process() {
+        const dsquare = [
+            [-1, -1], [-1, 0], [-1, 1],
+            [0, -1], [0, 0], [0, 1],
+            [1, -1], [1, 0], [1, 1]
+        ];
 
-        return this.state[x][y] ? 1 : 0; // TODO: does it work with this.state[x][y] only?
-    }
+        const chunks = new Map();
+        const seen = new Set();
 
-    countNeighbours(cellX, cellY) {
-        let count = 0;
+        for (const ck of this.chunks.keys()) {
+            const cp = vec2unpack(ck);
+            for (const [cdx, cdy] of dsquare) {
+                const ncp = cp.add(cdx, cdy);
+                const nck = ncp.pack();
 
-        for (let x = cellX - 1; x <= cellX + 1; ++x) {
-            if (x < 0 || x >= this.rows) {
-                continue;
-            }
+                if (seen.has(nck)) continue;
+                seen.add(nck);
 
-            for (let y = cellY - 1; y <= cellY + 1; ++y) {
-                if ((x == cellX && y == cellY) || y < 0 || y >= this.columns) {
-                    continue;
+                const cells = Array.from({ length: CHUNK_SIZE }, () => Array(CHUNK_SIZE).fill(false));
+                let anyAlive = false;
+
+                const origin = ncp.mul(CHUNK_SIZE); // this neighbor chunk origin
+
+                // for each cell
+                for (let x = 0; x < CHUNK_SIZE; ++x) {
+                    for (let y = 0; y < CHUNK_SIZE; ++y) {
+                        // count alive neighbors
+                        let n = 0;
+                        for (const [dx, dy] of dsquare) {
+                            if (dx === 0 && dy === 0) continue;
+                            if (!this.getCell(origin.add(x + dx, y + dy))) continue;
+                            if (++n > 3) break;
+                        }
+
+                        const wasAlive = this.getCell(origin.add(x, y));
+                        const willLive = wasAlive ? (n === 2 || n === 3) : n === 3;
+                        cells[x][y] = willLive;
+                        if (willLive) anyAlive = true;
+                    }
                 }
 
-                if (this.state[x][y] && ++count > 3) {
-                    return 4;
-                }
+                if (anyAlive) chunks.set(nck, new Chunk(cells));
             }
         }
 
-        return count;
+        return chunks;
     }
 
     step() {
-        let state = [];
-        for (let x = 0; x < this.rows; ++x) {
-            let line = [];
-            for (let y = 0; y < this.columns; ++y) {
-                let neighbours = this.countNeighbours(x, y);
-                if (this.state[x][y]) {
-                    line.push(neighbours == 2 || neighbours == 3);
-                } else {
-                    line.push(neighbours == 3);
-                }
-            }
-            state.push(line);
-        }
-
-        this.state = state;
+        this.chunks = this.process();
         this.render();
 
         if (++this.colorIndex >= COLORS.length) {
@@ -191,29 +300,7 @@ class Game {
         }
     }
 
-    click(event) {
-        let x = Math.floor(event.offsetX / CELL_SIZE);
-        let y = Math.floor(event.offsetY / CELL_SIZE);
-        if (x < 0 || x >= this.rows || y < 0 || y >= this.columns) {
-            return;
-        }
-
-        this.state[x][y] = !this.state[x][y];
-        if (this.state[x][y]) {
-            this.ctx.fillStyle = COLORS[this.colorIndex];
-        } else {
-            this.ctx.fillStyle = this.ctx.createLinearGradient(0, 0, this.ctx.canvas.width, 0);
-            this.ctx.fillStyle.addColorStop(0, FG_LEFT_COLOR);
-            this.ctx.fillStyle.addColorStop(1, FG_RIGHT_COLOR);
-        }
-        this.ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-    }
-
-    clear(alpha) {
-        if (typeof alpha === 'undefined') {
-            alpha = 'ff';
-        }
-
+    clear(alpha = 'ff') {
         this.ctx.fillStyle = this.ctx.createLinearGradient(0, 0, this.ctx.canvas.width, 0);
         this.ctx.fillStyle.addColorStop(0, FG_LEFT_COLOR + alpha);
         this.ctx.fillStyle.addColorStop(1, FG_RIGHT_COLOR + alpha);
@@ -223,44 +310,125 @@ class Game {
     render() {
         this.clear(COLOR_MASK);
 
-        for (let y = 0; y < this.columns; ++y) {
-            for (let x = 0; x < this.rows; ++x) {
-                if (this.state[x][y]) {
-                    this.ctx.fillStyle = COLORS[this.colorIndex];
-                    this.ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-                }
+        for (let cameraX = 0; cameraX < this.camera.rows; ++cameraX) {
+            for (let cameraY = 0; cameraY < this.camera.columns; ++cameraY) {
+                const worldPosition = this.camera.origin.add(cameraX, cameraY);
+                const cell = this.getCell(worldPosition);
+                if (!cell) continue;
+
+                this.ctx.fillStyle = COLORS[this.colorIndex];
+                this.ctx.fillRect(cameraX * CELL_SIZE, cameraY * CELL_SIZE, CELL_SIZE, CELL_SIZE);
             }
         }
     }
 }
 
-let resize = (game) => {
-    game.resize(Math.floor(window.innerWidth * 0.8 / CELL_SIZE), Math.floor(window.innerHeight * 0.8 / CELL_SIZE));
-};
+const Input = {
+    game: null,
+    canvas: null,
+    camera: null,
 
-let main = () => {
-    let app = document.getElementById('app');
-    let ctx = app.getContext('2d');
+    dragging: false,
+    moved: false,
+    origin: vec2(),
+    cameraOrigin: vec2(),
 
-    let game = new Game(app, ctx);
-    resize(game);
+    setup(game) {
+        Input.game = game;
+        Input.canvas = game.ctx.canvas;
+        Input.camera = game.camera;
 
-    document.addEventListener('keyup', (event) => {
-        if (event.code === "Space") {
-            if (game.running) {
-                game.stop();
+        document.addEventListener('keyup', Input.keyUp);
+
+        Input.canvas.addEventListener('mousedown', Input.dragStart);
+        Input.canvas.addEventListener('touchstart', Input.dragStart, { passive: false });
+        Input.canvas.addEventListener('mousemove', Input.drag);
+        Input.canvas.addEventListener('touchmove', Input.drag, { passive: false });
+        Input.canvas.addEventListener('mouseup', Input.dragEnd);
+        Input.canvas.addEventListener('touchend', Input.dragEnd);
+        Input.canvas.addEventListener('mouseleave', Input.dragEnd);
+        Input.canvas.addEventListener('touchcancel', Input.dragEnd);
+    },
+
+    getEventPosition(event) {
+        const rect = Input.canvas.getBoundingClientRect();
+        let clientX, clientY;
+        if (event.touches && event.touches.length) {
+            clientX = event.touches[0].clientX;
+            clientY = event.touches[0].clientY;
+        } else if (event.changedTouches && event.changedTouches.length) {
+            clientX = event.changedTouches[0].clientX;
+            clientY = event.changedTouches[0].clientY;
+        } else {
+            clientX = event.clientX;
+            clientY = event.clientY;
+        }
+
+        return vec2(clientX - rect.left, clientY - rect.top);
+    },
+
+    keyUp(event) {
+        if (event.code === 'Space') {
+            if (Input.game.running) {
+                Input.game.stop();
             } else {
-                game.run();
+                Input.game.run();
             }
-        } else if (event.code === "KeyS") {
-            game.step();
+        } else if (event.code === 'KeyS') {
+            Input.game.step();
             console.log('[CELLULAR] Step taken.');
         }
-    });
+    },
 
-    window.addEventListener('resize', (event) => {
-        resize(game);
-    });
+    click(event) {
+        const cell = Input.getEventPosition(event).div(CELL_SIZE).map(Math.floor).add(Input.camera.origin);
+        Input.game.setCell(cell, !Input.game.getCell(cell));
+        Input.game.render();
+    },
+
+    dragStart(event) {
+        event.preventDefault();
+        Input.dragging = true;
+        Input.moved = false;
+        Input.origin = Input.getEventPosition(event);
+        Input.cameraOrigin = Input.camera.origin;
+    },
+
+    drag(event) {
+        if (!Input.dragging) return;
+        event.preventDefault();
+
+        const dp = Input.getEventPosition(event).sub(Input.origin);
+        if (Math.abs(dp.x) > 2 || Math.abs(dp.y) > 2) Input.moved = true;
+        Input.camera.origin = Input.cameraOrigin.sub(dp.div(CELL_SIZE).map(Math.floor));
+        Input.game.render();
+    },
+    
+    dragEnd(event) {
+        if (!Input.dragging) return;
+        event.preventDefault();
+
+        Input.dragging = false;
+        if (!Input.moved && event.type !== 'mouseleave' && event.type !== 'touchcancel') {
+            Input.click(event);
+        }
+    },
+}
+
+const resize = (game) => {
+    game.camera.resize();
+    game.clear();
+    game.render();
+};
+
+const main = () => {
+    const app = document.getElementById('app');
+    const ctx = app.getContext('2d');
+
+    const game = new Game(app, ctx);
+    resize(game);
+    window.addEventListener('resize', () => resize(game));
+    Input.setup(game);
 
     // new Structure(`
     //     #C This is a glider.
