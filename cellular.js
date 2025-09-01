@@ -33,6 +33,7 @@ class Vec2 {
         if (typeof a === 'number') {
             return vec2(this.x + a, this.y + (b ?? a));
         }
+        throw new Error(`unrecognized type of ${a}`);
     }
 
     sub(a, b) {
@@ -42,6 +43,7 @@ class Vec2 {
         if (typeof a === 'number') {
             return vec2(this.x - a, this.y - (b ?? a));
         }
+        throw new Error(`unrecognized type of ${a}`);
     }
 
     mul(a, b) {
@@ -51,6 +53,7 @@ class Vec2 {
         if (typeof a === 'number') {
             return vec2(this.x * a, this.y * (b ?? a));
         }
+        throw new Error(`unrecognized type of ${a}`);
     }
 
     div(a, b) {
@@ -60,6 +63,7 @@ class Vec2 {
         if (typeof a === 'number') {
             return vec2(this.x / a, this.y / (b ?? a));
         }
+        throw new Error(`unrecognized type of ${a}`);
     }
 
     map(a, b) {
@@ -145,8 +149,8 @@ class Camera {
     }
 
     resize() {
-        this.rows = Math.floor(window.innerWidth * 0.8 / CELL_SIZE);
-        this.columns = Math.floor(window.innerHeight * 0.8 / CELL_SIZE);
+        this.rows = Math.floor(this.app.clientWidth / CELL_SIZE);
+        this.columns = Math.floor(this.app.clientHeight / CELL_SIZE);
         this.app.width = CELL_SIZE * this.rows;
         this.app.height = CELL_SIZE * this.columns;
     }
@@ -157,8 +161,8 @@ class Chunk {
         this.cells = cells || Array.from({ length: CHUNK_SIZE }, () => Array(CHUNK_SIZE).fill(false));
 
         this.count = 0;
-        for (const row of this.cells) {
-            for (const cell of row) {
+        for (const line of this.cells) {
+            for (const cell of line) {
                 if (cell) ++this.count;
             }
         }
@@ -177,9 +181,10 @@ class Chunk {
 }
 
 class Game {
-    constructor(app, ctx) {
+    constructor(app, ctx, playback) {
         this.app = app;
         this.ctx = ctx;
+        this.playback = playback;
         this.camera = new Camera(app);
         this.chunks = new Map(); // key => chunk with CHUNK_SIZE x CHUNK_SIZE cells
         this.running = null;
@@ -226,6 +231,7 @@ class Game {
 
         this.step();
         this.running = setInterval(() => this.step(), CELL_LIFE);
+        this.playback.dataset.playing = ''
 
         console.log('[CELLULAR] Simulation ran.');
     }
@@ -238,15 +244,30 @@ class Game {
 
         clearInterval(this.running);
         this.running = null;
+        delete this.playback.dataset.playing;
 
         console.log('[CELLULAR] Simulation stopped.');
     }
 
+    toggle() {
+        if (this.running) {
+            this.stop();
+        } else {
+            this.run();
+        }
+    }
+
     process() {
-        const dsquare = [
+        const DSQUARE = [
             [-1, -1], [-1, 0], [-1, 1],
-            [0, -1], [0, 0], [0, 1],
-            [1, -1], [1, 0], [1, 1]
+            [0, -1],  [0, 0],  [0, 1],
+            [1, -1],  [1, 0],  [1, 1]
+        ];
+
+        const DSQUAREHOLLOW = [
+            [-1, -1], [-1, 0], [-1, 1],
+            [0, -1],           [0, 1],
+            [1, -1],  [1, 0],  [1, 1]
         ];
 
         const chunks = new Map();
@@ -254,7 +275,7 @@ class Game {
 
         for (const ck of this.chunks.keys()) {
             const cp = vec2unpack(ck);
-            for (const [cdx, cdy] of dsquare) {
+            for (const [cdx, cdy] of DSQUARE) {
                 const ncp = cp.add(cdx, cdy);
                 const nck = ncp.pack();
 
@@ -262,7 +283,7 @@ class Game {
                 seen.add(nck);
 
                 const cells = Array.from({ length: CHUNK_SIZE }, () => Array(CHUNK_SIZE).fill(false));
-                let anyAlive = false;
+                let survived = false;
 
                 const origin = ncp.mul(CHUNK_SIZE); // this neighbor chunk origin
 
@@ -271,8 +292,7 @@ class Game {
                     for (let y = 0; y < CHUNK_SIZE; ++y) {
                         // count alive neighbors
                         let n = 0;
-                        for (const [dx, dy] of dsquare) {
-                            if (dx === 0 && dy === 0) continue;
+                        for (const [dx, dy] of DSQUAREHOLLOW) {
                             if (!this.getCell(origin.add(x + dx, y + dy))) continue;
                             if (++n > 3) break;
                         }
@@ -280,11 +300,11 @@ class Game {
                         const wasAlive = this.getCell(origin.add(x, y));
                         const willLive = wasAlive ? (n === 2 || n === 3) : n === 3;
                         cells[x][y] = willLive;
-                        if (willLive) anyAlive = true;
+                        if (willLive) survived = true;
                     }
                 }
 
-                if (anyAlive) chunks.set(nck, new Chunk(cells));
+                if (survived) chunks.set(nck, new Chunk(cells));
             }
         }
 
@@ -327,6 +347,7 @@ const Input = {
     game: null,
     canvas: null,
     camera: null,
+    playback: null,
 
     dragging: false,
     moved: false,
@@ -337,8 +358,10 @@ const Input = {
         Input.game = game;
         Input.canvas = game.ctx.canvas;
         Input.camera = game.camera;
+        Input.playback = game.playback;
 
         document.addEventListener('keyup', Input.keyUp);
+        Input.playback.addEventListener('click', () => Input.game.toggle());
 
         Input.canvas.addEventListener('mousedown', Input.dragStart);
         Input.canvas.addEventListener('touchstart', Input.dragStart, { passive: false });
@@ -369,11 +392,7 @@ const Input = {
 
     keyUp(event) {
         if (event.code === 'Space') {
-            if (Input.game.running) {
-                Input.game.stop();
-            } else {
-                Input.game.run();
-            }
+            Input.game.toggle();
         } else if (event.code === 'KeyS') {
             Input.game.step();
             console.log('[CELLULAR] Step taken.');
@@ -424,8 +443,9 @@ const resize = (game) => {
 const main = () => {
     const app = document.getElementById('app');
     const ctx = app.getContext('2d');
+    const playback = document.getElementById('playback');
 
-    const game = new Game(app, ctx);
+    const game = new Game(app, ctx, playback);
     resize(game);
     window.addEventListener('resize', () => resize(game));
     Input.setup(game);
