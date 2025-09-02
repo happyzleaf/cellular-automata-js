@@ -1,13 +1,17 @@
 :root {
-    /* Light mode */
-    /* --bg: white; */
-    /* --fg-left: #743ad5; */
-    /* --fg-right: #d53a9d; */
+    --bg: #ffffff;
+    --fg: #343a40;
+    --accent-left: #ff9899;
+    --accent-right: #fde5b4;
+}
 
-    /* Dark mode */
-    --bg: #343a40;
-    --fg-left: #743ad5;
-    --fg-right: #d53a9d;
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #343a40;
+        --fg: #ffffff;
+        --accent-left: #743ad5;
+        --accent-right: #d53a9d;
+    }
 }
 
 html,
@@ -20,6 +24,7 @@ body,
 svg {
     width: 100%;
     height: auto;
+    fill: currentColor;
 }
 
 @media (prefers-reduced-motion) {
@@ -43,7 +48,7 @@ body {
     height: 80%;
     /* padding: 10px; */
 
-    /* background: linear-gradient(to left, var(--fg-right), var(--fg-left)); */
+    /* background: linear-gradient(to left, var(--accent-right), var(--accent-left)); */
     box-shadow: 0 19px 38px rgba(0, 0, 0, 0.30), 0 15px 12px rgba(0, 0, 0, 0.22);
 }
 
@@ -59,7 +64,7 @@ body {
     bottom: 3%;
 
     background: var(--bg);
-    /* color: var(--fg-right); */
+    color: var(--fg);
     /* border: 10px solid var(--bg); */
     border-radius: 15%;
 

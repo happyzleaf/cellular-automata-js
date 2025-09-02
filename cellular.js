@@ -5,8 +5,8 @@ const CELL_LIFE = 100; // in millis
 const CHUNK_SIZE = 32; // cells per chunk
 
 const BG_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--bg');
-const FG_LEFT_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--fg-left');
-const FG_RIGHT_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--fg-right');
+const ACCENT_LEFT_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--accent-left');
+const ACCENT_RIGHT_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--accent-right');
 
 // Rainbow
 // const COLORS = ['#ff0000', '#ffa500', '#ffff00', '#008000', '#0000ff', '#4b0082', '#ee82ee'];
@@ -322,8 +322,8 @@ class Game {
 
     clear(alpha = 'ff') {
         this.ctx.fillStyle = this.ctx.createLinearGradient(0, 0, this.ctx.canvas.width, 0);
-        this.ctx.fillStyle.addColorStop(0, FG_LEFT_COLOR + alpha);
-        this.ctx.fillStyle.addColorStop(1, FG_RIGHT_COLOR + alpha);
+        this.ctx.fillStyle.addColorStop(0, ACCENT_LEFT_COLOR + alpha);
+        this.ctx.fillStyle.addColorStop(1, ACCENT_RIGHT_COLOR + alpha);
         this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
     }
 
