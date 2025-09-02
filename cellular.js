@@ -26,6 +26,20 @@ class Vec2 {
         this.y = y;
     }
 
+    length() {
+        return Math.hypot(this.x, this.y);
+    }
+
+    distance(a, b) {
+        if (a instanceof Vec2) {
+            return this.sub(a).length();
+        }
+        if (typeof a === 'number') {
+            return this.sub(a, b ?? a).length();
+        }
+        throw new Error(`unrecognized type of ${a}`);
+    }
+
     add(a, b) {
         if (a instanceof Vec2) {
             return vec2(this.x + a.x, this.y + a.y);
@@ -417,9 +431,11 @@ const Input = {
         if (!Input.dragging) return;
         event.preventDefault();
 
-        const dp = Input.getEventPosition(event).sub(Input.origin);
-        if (Math.abs(dp.x) > 2 || Math.abs(dp.y) > 2) Input.moved = true;
-        Input.camera.origin = Input.cameraOrigin.sub(dp.div(CELL_SIZE).map(Math.floor));
+        const dp = Input.cameraOrigin.sub(Input.getEventPosition(event).sub(Input.origin).div(CELL_SIZE).map(Math.floor));
+        if (Input.camera.origin.distance(dp) < 1) return;
+
+        Input.moved = true;
+        Input.camera.origin = dp;
         Input.game.render();
     },
     
