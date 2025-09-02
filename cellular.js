@@ -173,7 +173,7 @@ class Chunk {
     }
 
     set(cell, alive) {
-        const wasAlive = this.cells[cell.x, cell.y];
+        const wasAlive = this.cells[cell.x][cell.y];
         this.cells[cell.x][cell.y] = alive;
         if (wasAlive && !alive) --this.count;
         else if (!wasAlive && alive) ++this.count;
@@ -218,7 +218,7 @@ class Game {
         const cellPosition = worldPosition.sub(chunkPosition.mul(CHUNK_SIZE));
         chunk.set(cellPosition, alive);
         if (!alive && !chunk.count) {
-            const chunkKey = chunkPosition.unpack();
+            const chunkKey = chunkPosition.pack();
             this.chunks.delete(chunkKey);
         }
     }
@@ -465,4 +465,4 @@ const main = () => {
     // `);
 };
 
-main();
+window.addEventListener('DOMContentLoaded', main);

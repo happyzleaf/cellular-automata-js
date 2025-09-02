@@ -39,22 +39,26 @@ body {
 }
 
 #playback {
+    position: absolute;
+    max-width: min(10vw, 10vh);
+    min-width: .5rem;
+    width: 2rem;
+    height: auto;
+
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 3%;
+
     opacity: .2;
     transition: opacity .5s;
-
  
-    &:not([data-playing]) #pause {
+    &[data-playing] #play, &:not([data-playing]) #pause {
         display: none;
     }
 
     .icon {
-        position: absolute;
-        width: 5%;
+        width: 100%;
         height: auto;
-
-        left: 50%;
-        transform: translateX(-50%);
-        bottom: 3%;
 
         background: var(--bg);
         color: var(--fg-right);
@@ -69,8 +73,14 @@ body {
     }
 }
 
-@media(hover: hover) {
+@media (hover: hover) {
     #playback:hover {
         opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion) {
+    #playback {
+        transition: none;
     }
 }
