@@ -17,12 +17,9 @@ body,
     height: 100%;
 }
 
-body {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    background: var(--bg);
+svg {
+    width: 100%;
+    height: auto;
 }
 
 @media (prefers-reduced-motion) {
@@ -30,6 +27,14 @@ body {
         transition: none !important;
         animation: none !important;
     }
+}
+
+body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: var(--bg);
 }
 
 #stage {
@@ -62,7 +67,12 @@ body {
     transition: opacity .5s;
 }
 
-#playback[data-playing] #play, #playback:not([data-playing]) #pause {
+#playback[data-playing] #play {
+    display: none;
+}
+
+/* Needs repetiton for a bug in Safari */
+#playback:not([data-playing]) #pause {
     display: none;
 }
 
