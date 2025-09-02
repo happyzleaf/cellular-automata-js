@@ -11,7 +11,9 @@
 }
 
 html,
-body {
+body,
+#app {
+    width: 100%;
     height: 100%;
 }
 
@@ -21,6 +23,13 @@ body {
     justify-content: center;
 
     background: var(--bg);
+}
+
+@media (prefers-reduced-motion) {
+    * {
+        transition: none !important;
+        animation: none !important;
+    }
 }
 
 #stage {
@@ -33,12 +42,7 @@ body {
     box-shadow: 0 19px 38px rgba(0, 0, 0, 0.30), 0 15px 12px rgba(0, 0, 0, 0.22);
 }
 
-#app {
-    width: 100%;
-    height: 100%;
-}
-
-#playback {
+#playback .icon {
     position: absolute;
     max-width: min(10vw, 10vh);
     min-width: 2rem;
@@ -49,38 +53,27 @@ body {
     transform: translateX(-50%);
     bottom: 3%;
 
+    background: var(--bg);
+    /* color: var(--fg-right); */
+    /* border: 10px solid var(--bg); */
+    border-radius: 15%;
+
     opacity: .2;
     transition: opacity .5s;
- 
-    &[data-playing] #play, &:not([data-playing]) #pause {
-        display: none;
-    }
+}
 
-    .icon {
-        width: 100%;
-        height: auto;
-
-        background: var(--bg);
-        color: var(--fg-right);
-        /* border: 10px solid var(--bg); */
-        border-radius: 15%;
-    }
+#playback[data-playing] #play, #playback:not([data-playing]) #pause {
+    display: none;
 }
 
 @starting-style {
-    #playback {
+    #playback .icon {
         opacity: .2;
     }
 }
 
 @media (hover: hover) {
-    #playback:hover {
+    #playback .icon:hover {
         opacity: 1;
-    }
-}
-
-@media (prefers-reduced-motion) {
-    #playback {
-        transition: none;
     }
 }
