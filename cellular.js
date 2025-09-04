@@ -4,9 +4,10 @@ const CELL_SIZE = 15;
 const CELL_LIFE = 100; // in millis
 const CHUNK_SIZE = 32; // cells per chunk
 
-const BG_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--bg');
-const ACCENT_LEFT_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--accent-left');
-const ACCENT_RIGHT_COLOR = getComputedStyle(document.documentElement).getPropertyValue('--accent-right');
+// TODO: I imagine this should be cached or listened to
+const BG_COLOR = () => getComputedStyle(document.documentElement).getPropertyValue('--bg');
+const ACCENT_LEFT_COLOR = () => getComputedStyle(document.documentElement).getPropertyValue('--accent-left');
+const ACCENT_RIGHT_COLOR = () => getComputedStyle(document.documentElement).getPropertyValue('--accent-right');
 
 // Rainbow
 // const COLORS = ['#ff0000', '#ffa500', '#ffff00', '#008000', '#0000ff', '#4b0082', '#ee82ee'];
@@ -27,7 +28,7 @@ class Vec2 {
     }
 
     length() {
-        return Math.hypot(this.x, this.y);
+        return Math.hypot(this.x * this.x, this.y * this.y);
     }
 
     distance(a, b) {
@@ -92,6 +93,16 @@ class Vec2 {
         return (X << 32n) | Y;
     }
 }
+const DNEIGHBORHOOD = [
+    vec2(-1, -1), vec2(-1, 0), vec2(-1, 1),
+    vec2(0, -1),  vec2(0, 0),  vec2(0, 1),
+    vec2(1, -1),  vec2(1, 0),  vec2(1, 1)
+];
+const DNEIGHBORS = [
+    vec2(-1, -1), vec2(-1, 0), vec2(-1, 1),
+    vec2(0, -1),               vec2(0, 1),
+    vec2(1, -1),  vec2(1, 0),  vec2(1, 1)
+];
 
 const REG_REMOVE_WHITESPACE = /\s*/g;
 const REG_GET_XY = /^x=(\d+),y=(\d+).*$/i;
@@ -272,54 +283,45 @@ class Game {
     }
 
     process() {
-        const DSQUARE = [
-            [-1, -1], [-1, 0], [-1, 1],
-            [0, -1],  [0, 0],  [0, 1],
-            [1, -1],  [1, 0],  [1, 1]
-        ];
-
-        const DSQUAREHOLLOW = [
-            [-1, -1], [-1, 0], [-1, 1],
-            [0, -1],           [0, 1],
-            [1, -1],  [1, 0],  [1, 1]
-        ];
-
-        const chunks = new Map();
-        const seen = new Set();
-
+        const neighborhood = new Set();
         for (const ck of this.chunks.keys()) {
             const cp = vec2unpack(ck);
-            for (const [cdx, cdy] of DSQUARE) {
-                const ncp = cp.add(cdx, cdy);
-                const nck = ncp.pack();
-
-                if (seen.has(nck)) continue;
-                seen.add(nck);
-
-                const cells = Array.from({ length: CHUNK_SIZE }, () => Array(CHUNK_SIZE).fill(false));
-                let survived = false;
-
-                const origin = ncp.mul(CHUNK_SIZE); // this neighbor chunk origin
-
-                // for each cell
-                for (let x = 0; x < CHUNK_SIZE; ++x) {
-                    for (let y = 0; y < CHUNK_SIZE; ++y) {
-                        // count alive neighbors
-                        let n = 0;
-                        for (const [dx, dy] of DSQUAREHOLLOW) {
-                            if (!this.getCell(origin.add(x + dx, y + dy))) continue;
-                            if (++n > 3) break;
-                        }
-
-                        const wasAlive = this.getCell(origin.add(x, y));
-                        const willLive = wasAlive ? (n === 2 || n === 3) : n === 3;
-                        cells[x][y] = willLive;
-                        if (willLive) survived = true;
-                    }
-                }
-
-                if (survived) chunks.set(nck, new Chunk(cells));
+            for (const dp of DNEIGHBORHOOD) {
+                const ncp = cp.add(dp);
+                // if (neighborhood.has(ncp)) continue; // Useless in sets
+                neighborhood.add(ncp);
             }
+        }
+
+        const chunks = new Map();
+        for (const cp of neighborhood) {
+            const ck = cp.pack();
+
+            const cells = Array.from({ length: CHUNK_SIZE }, () => Array(CHUNK_SIZE).fill(false));
+            let anySurvivors = false;
+
+            const origin = cp.mul(CHUNK_SIZE); // this neighbor chunk origin
+
+            // for each cell
+            for (let x = 0; x < CHUNK_SIZE; ++x) {
+                for (let y = 0; y < CHUNK_SIZE; ++y) {
+                    const p = origin.add(x, y);
+
+                    // count alive neighbors
+                    let n = 0;
+                    for (const dp of DNEIGHBORS) {
+                        if (!this.getCell(p.add(dp))) continue;
+                        if (++n > 3) break;
+                    }
+
+                    const wasAlive = this.getCell(p);
+                    const willLive = wasAlive ? (n === 2 || n === 3) : n === 3;
+                    cells[x][y] = willLive;
+                    if (willLive) anySurvivors = true;
+                }
+            }
+
+            if (anySurvivors) chunks.set(ck, new Chunk(cells));
         }
 
         return chunks;
@@ -336,8 +338,8 @@ class Game {
 
     clear(alpha = 'ff') {
         this.ctx.fillStyle = this.ctx.createLinearGradient(0, 0, this.ctx.canvas.width, 0);
-        this.ctx.fillStyle.addColorStop(0, ACCENT_LEFT_COLOR + alpha);
-        this.ctx.fillStyle.addColorStop(1, ACCENT_RIGHT_COLOR + alpha);
+        this.ctx.fillStyle.addColorStop(0, ACCENT_LEFT_COLOR() + alpha);
+        this.ctx.fillStyle.addColorStop(1, ACCENT_RIGHT_COLOR() + alpha);
         this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
     }
 
